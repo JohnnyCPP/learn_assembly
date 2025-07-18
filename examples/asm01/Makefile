@@ -14,7 +14,7 @@ ${NAME}.o:
 #
 # "-no-pie" disables Position-Independent Executables for simplicity
 ${NAME}: ${NAME}.o
-	cc -no-pie ${NAME}.o -o ${NAME}
+	ld ${NAME}.o -o ${NAME}
 
 
 clean:
