@@ -62,21 +62,22 @@ global _start
 # "_start" is overriding the default "_start" symbol that the 
 # linker would provide (from libc)
 _start:
-	mov rax, 1    # "1" corresponds to the write syscall
-    # for syscalls, "rdi" holds the first argument
-    # here, "1" is the fd for stdout
+	# "1" corresponds to the write syscall
+	mov rax, 1
+	# for syscalls, "rdi" holds the first argument
+	# here, "1" is the fd for stdout
 	mov rdi, 1
-    # "rsi" holds the second argument
-    # moves the address of "msg" into "rsi"
+	# "rsi" holds the second argument
+	# moves the address of "msg" into "rsi"
 	mov rsi, msg
-    # "rdx" holds the third argument
-    # moves "len" into "rdx"
+	# "rdx" holds the third argument
+	# moves "len" into "rdx"
 	mov rdx, len
-    # execute system service number 1
-    # write(1, msg, len)
+	# execute system service number 1
+	# write(1, msg, len)
 	syscall
 	mov rax, 60   # "60" corresponds to the exit syscall
 	xor rdi, rdi  # quickly zero out a register
-    # execute system service number 60
-    # exit(0)
+	# execute system service number 60
+	# exit(0)
 	syscall

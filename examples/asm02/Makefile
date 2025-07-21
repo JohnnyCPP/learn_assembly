@@ -1,4 +1,4 @@
-NAME		= hello_world
+NAME		= echo_input
 SOURCE		= ${NAME}.asm
 
 
