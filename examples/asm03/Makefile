@@ -1,4 +1,4 @@
-NAME		= echo_input
+NAME		= add_nums
 SOURCE		= ${NAME}.asm
 
 
