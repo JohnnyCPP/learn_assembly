@@ -6,15 +6,15 @@
 
 section .data
 	# declare "result_buffer" memory location and
-	# initialize 21 bytes with value 0 into it
+	# initialize 22 bytes with value 0 into it
 	#
 	# the "times" directive repeats something a number of times
 	#
 	# stores memory for up to 20 digits
 	# (max length of a 64-bit decimal integer)
-	# plus the null terminator '0'
-	result_buffer times 21 db 0
-	err_msg db "Introduce 2 arguments.", 10
+	# plus the newline '\n' and null terminator '0' characters
+	result_buffer times 22 db 0
+	err_msg db "Error: expected 2 numeric arguments.", 10
 	err_msg_len equ $ - err_msg
 section .text
 	global _start
@@ -70,6 +70,9 @@ int_to_str:
 	mov rcx, 10         # sets divisor of "div" to 10, 
 	                    # because the integer is base 10
 	mov rbx, rdi        # saves the end of the buffer in "rbx"
+	# add a newline character
+	dec rdi
+	mov byte [rdi], 10
 .convert_loop:
 	# "rdx" is the 64-bit register of 8-bit "dl" 
 	# for a 64-bit divisor, "div" requires "rdx" to be zeroed 
@@ -80,7 +83,7 @@ int_to_str:
 	add dl, '0'         # encodes current digit to ASCII
 	dec rdi             # decreases string pointer by a magnitude of 1
 	                    # (filling it from right to left)
-	mov [rdi], dl       # assigns ASCII encoded digit in current character
+	mov byte [rdi], dl  # assigns ASCII encoded digit in current character
 	test rax, rax       # checks if "rax" is zero
 	jnz .convert_loop   # loops if "rax" is not zero
 	mov rax, rbx        # restores the end of the buffer in "rax"
@@ -88,7 +91,7 @@ int_to_str:
 	                    # "rdi" has been moved to the left until 
 						# there was no more digits to add
 						# (so "rdi" is in the first character of the string)
-	mov [result_len], rax
+	mov dword [result_len], eax
 	pop rbx
 	ret
 _start:
@@ -97,27 +100,30 @@ _start:
 	# arguments must be manually extracted from the stack
 	# using the stack pointer "rsp"
 	mov r12, rsp        # r12 = pointer to argc
-	mov rdi, [r12]      # rdi = argc
+	# rdi = argc
+	mov edi, dword [r12]
 	cmp rdi, 3          # checks the presence of 3 args
 	                    # (path_to_executable, num1, & num2)
 	# if "rdi" != 3, jumps to label
-	jne .not_enough_args 
-	mov rbx, [r12 + 16] # rbx = argv[1]
+	jne .error_argc 
+	# rbx = argv[1]
+	mov rbx, qword [r12 + 8 * 2]
 	# the return address pushed by "call" is the address of the first byte 
 	# of the next instruction immediately after it, 
 	# "ret" pops the return address and jumps to it
 	call str_to_int     # gets decimal representation of "rbx" in "rax"
 	mov r13, rax        # first number in r13
-	mov rbx, [r12 + 24] # rbx = argv[2]
+	# rbx = argv[2]
+	mov rbx, qword [r12 + 8 * 3]
 	call str_to_int     # gets decimal representation of "rbx" in "rax"
 	add rax, r13        # rax += first number
 	# "result_buffer + 20" is the pointer to the null terminator 
 	# of the result's string representation, because the buffer 
 	# has a size of 21 bytes
-	mov rdi, result_buffer + 20
+	mov rdi, result_buffer + 21
 	call int_to_str     # gets string representation of "rax" in "rdi"
 	# prints result and exits with return code 0
-	mov rdx, result_len
+	mov edx, dword [result_len]
 	# "rdi" is a pointer to the string representation of the addition 
 	# of the two numbers in argv[1] & argv[2]
 	mov rsi, rdi
@@ -128,7 +134,7 @@ _start:
 	xor rdi, rdi
 	syscall             # execute system service number 60
 	# prints "err_msg" and exits with return code 1
-.not_enough_args:
+.error_argc:
 	mov rax, 1
 	mov rdi, 2
 	mov rsi, err_msg
