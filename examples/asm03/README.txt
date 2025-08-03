@@ -2,7 +2,6 @@
 
 # TODO:
 #   - buffer safety: check that "argv" strings don't overflow "result_buffer"
-#   - error handling: validate that arguments are valid integers
 
 section .data
 	# declare "result_buffer" memory location and
@@ -22,10 +21,6 @@ section .text
 # converts string in RBX to integer (returns in RAX)
 # ##################################################
 str_to_int:
-	# "rbx" is a callee-saved register, to modify it in the subroutine, 
-	#       save its state on the Stack (push) and restore it when 
-	#       the subroutine ends (pop), to comply with System V ABI
-	push rbx
 	# clears "rax" and "rcx"
 	xor rax, rax
 	xor rcx, rcx
@@ -40,7 +35,7 @@ str_to_int:
 	#    (which explains the "byte" size directive)
 	#  - "cl" contains the lower 8 bits of "rcx"
 	#    (which explains that "rcx" is added to "rax" each iteration)
-	mov cl, byte [rbx]
+	mov cl, byte [rdi]
 	# if next character is a null terminator, breaks the loop
 	cmp cl, 0
 	je .done
@@ -52,11 +47,10 @@ str_to_int:
 	# adds the next digit to "rax"
 	add rax, rcx
 	# moves pointer in "rbx" to the next character and loops
-	inc rbx
+	inc rdi
 	jmp .next_digit
 	# the cpu jumps to this label when the null terminator is found
 .done:
-	pop rbx
 	# "ret" pops the return address from the stack and jumps to it:
 	# - the return address is pushed onto the stack by "call"
 	# - the return address points to the instruction just below "call"
@@ -66,6 +60,9 @@ str_to_int:
 # converts integer in RAX to string (returns pointer in RDI)
 # ##########################################################
 int_to_str:
+	# "rbx" is a callee-saved register, to modify it in the subroutine, 
+	#       save its state on the Stack (push) and restore it when 
+	#       the subroutine ends (pop), to comply with System V ABI
 	push rbx
 	mov rcx, 10         # sets divisor of "div" to 10, 
 	                    # because the integer is base 10
@@ -94,27 +91,64 @@ int_to_str:
 	mov dword [result_len], eax
 	pop rbx
 	ret
+#######################################################
+# args: rdi = pointer to null-terminated string
+# returns: rax = 1 (is number) if all chars are digits, 
+#          else 0 (is not number)
+#######################################################
+is_number:
+        push rbx
+.compare_loop:
+        cmp byte [rdi], '0'
+        jl .not_a_number
+        cmp byte [rdi], '9'
+        jg .not_a_number
+        inc rdi
+        mov bl, byte [rdi]
+        test bl, bl
+        jnz .compare_loop
+        mov rax, 1
+        jmp .done
+.not_a_number:
+        mov rax, 0
+.done:
+        pop rbx
+        ret
 _start:
 	# this program starts without libc, the linux kernel 
 	# only sets up the arguments in the stack, not registers
 	# arguments must be manually extracted from the stack
 	# using the stack pointer "rsp"
-	mov r12, rsp        # r12 = pointer to argc
-	# rdi = argc
-	mov edi, dword [r12]
-	cmp rdi, 3          # checks the presence of 3 args
+	# 
+	# rsp = argc
+	# "argc" is stored as a full 64-bit value (8 bytes) 
+	#        because this is x86_64
+	cmp qword [rsp], 3  # checks the presence of 3 args
 	                    # (path_to_executable, num1, & num2)
 	# if "rdi" != 3, jumps to label
 	jne .error_argc 
 	# rbx = argv[1]
-	mov rbx, qword [r12 + 8 * 2]
+	mov rdi, qword [rsp + 8 * 2]
+	#   - "rdi" = argv[1]
+	#   - loop for each character and check if it's [0-9]
+	#   - return a boolean in "rax"
+	push rdi
+	call is_number      # validate argv[1]
+	pop rdi
+	test rax, rax
+	jz .error_not_a_number
 	# the return address pushed by "call" is the address of the first byte 
 	# of the next instruction immediately after it, 
 	# "ret" pops the return address and jumps to it
 	call str_to_int     # gets decimal representation of "rbx" in "rax"
 	mov r13, rax        # first number in r13
 	# rbx = argv[2]
-	mov rbx, qword [r12 + 8 * 3]
+	mov rdi, qword [rsp + 8 * 3]
+	push rdi
+	call is_number      # validate argv[2]
+	pop rdi
+	test rax, rax
+	jz .error_not_a_number
 	call str_to_int     # gets decimal representation of "rbx" in "rax"
 	add rax, r13        # rax += first number
 	# "result_buffer + 20" is the pointer to the null terminator 
@@ -143,4 +177,13 @@ _start:
 	mov rax, 60
 	mov rdi, 1
 	syscall             # execute system service number 60
+.error_not_a_number:
+	mov rax, 1
+	mov rdi, 2
+	mov rsi, err_not_a_number
+	mov rdx, err_not_a_number_len
+	syscall
+	mov rax, 60
+	mov rdi, 1
+	syscall
 

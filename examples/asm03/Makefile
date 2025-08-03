@@ -6,8 +6,11 @@ all: ${NAME}
 
 
 # assemble
+#
+# -g: generate debug symbols
+# -F dwarf: specify DWARF debug format used by GDB
 ${NAME}.o:
-	nasm -f elf64 ${SOURCE} -o ${NAME}.o
+	nasm -f elf64 -g -F dwarf ${SOURCE} -o ${NAME}.o
 
 
 # link
