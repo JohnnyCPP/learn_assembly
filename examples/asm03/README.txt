@@ -91,29 +91,37 @@ int_to_str:
 	mov dword [result_len], eax
 	pop rbx
 	ret
-#######################################################
+####################################################################
 # args: rdi = pointer to null-terminated string
 # returns: rax = 1 (is number) if all chars are digits, 
-#          else 0 (is not number)
-#######################################################
+#          rax = 0 (is not number) if a char is not a digit, 
+#          rax = 2 (overflow) if string contains more than 18 digits
+####################################################################
 is_number:
-        push rbx
+	push rbx
+	xor rax, rax        # count str length with "rax"
 .compare_loop:
-        cmp byte [rdi], '0'
-        jl .not_a_number
-        cmp byte [rdi], '9'
-        jg .not_a_number
-        inc rdi
-        mov bl, byte [rdi]
-        test bl, bl
-        jnz .compare_loop
-        mov rax, 1
-        jmp .done
+	cmp byte [rdi], '0'
+	jl .not_a_number
+	cmp byte [rdi], '9'
+	jg .not_a_number
+	inc rdi
+	inc rax
+	cmp rax, 18         # limit arguments to 18 digits
+	ja .integer_overflow
+	mov bl, byte [rdi]
+	test bl, bl
+	jnz .compare_loop
+	mov rax, 1
+	jmp .done
+.integer_overflow:
+	mov rax, 2
+	jmp .done
 .not_a_number:
-        mov rax, 0
+	mov rax, 0
 .done:
-        pop rbx
-        ret
+	pop rbx
+	ret
 _start:
 	# this program starts without libc, the linux kernel 
 	# only sets up the arguments in the stack, not registers
@@ -135,6 +143,8 @@ _start:
 	push rdi
 	call is_number      # validate argv[1]
 	pop rdi
+	cmp rax, 2
+	je .error_overflow  # if string contains more than 18 digits, print an error
 	test rax, rax
 	jz .error_not_a_number
 	# the return address pushed by "call" is the address of the first byte 
@@ -147,6 +157,8 @@ _start:
 	push rdi
 	call is_number      # validate argv[2]
 	pop rdi
+	cmp rax, 2
+	je .error_overflow
 	test rax, rax
 	jz .error_not_a_number
 	call str_to_int     # gets decimal representation of "rbx" in "rax"
@@ -177,6 +189,15 @@ _start:
 	mov rax, 60
 	mov rdi, 1
 	syscall             # execute system service number 60
+.error_overflow:
+	mov rax, 1
+	mov rdi, 2
+	mov rsi, err_overflow
+	mov rdx, err_overflow_len
+	syscall
+	mov rax, 60
+	mov rdi, 1
+	syscall
 .error_not_a_number:
 	mov rax, 1
 	mov rdi, 2
