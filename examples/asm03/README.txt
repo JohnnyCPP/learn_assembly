@@ -1,8 +1,5 @@
 # this file explains "add_nums.asm"
 
-# TODO:
-#   - buffer safety: check that "argv" strings don't overflow "result_buffer"
-
 section .data
 	# declare "result_buffer" memory location and
 	# initialize 22 bytes with value 0 into it
